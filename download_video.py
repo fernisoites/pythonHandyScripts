@@ -9,17 +9,35 @@ from selenium.webdriver.firefox.firefox_binary import FirefoxBinary
 
 _FIREFOX_LOC = "/Applications/Firefox.app/Contents/MacOS/firefox-bin"
 
+class Episode:
+    def __init__(self, url, stId, parentDir, episodeName):
+        self.url = url
+        self.stId = stId
+        self.directory = os.path.join(parentDir, episodeName)
+        self.episodeName = episodeName
+        self.fileName = "{}{}.mp4".format(episodeName, stId)
+        self.fileFullPath = os.path.join(self.directory, self.fileName)
+
 #download video from url to given filename
 #sample url: "http://www.dnvod.tv/Movie/detail.aspx?id=izUp3%2FnFhtY%3D"
 #driver is web driver
-def downloadFromUrl(url, fileName, driver = None):
+def downloadFromEpisode(episode, driver = None):
     if not driver: driver = getDriver()
-    if not url: 
+    if not episode or not episode.url:
         print "Error: no url provided!"
+        driver.close()
+        return
+    
+    if not os.path.exists(episode.directory):
+        os.makedirs(episode.directory)
+    
+    if os.path.exists(episode.fileFullPath):
+        print "File exist, skip downloading"
+        driver.close()
         return
 
-    print "Processing url: {}".format(url)
-    driver.get(url)
+    print "Processing url: {}".format(episode.url)
+    driver.get(episode.url)
 
     found = False
     while not found:
@@ -31,9 +49,9 @@ def downloadFromUrl(url, fileName, driver = None):
                 if ".mp4" in short and "sourceIp" in short and "signature" in short:
                     found = True
                     trueUrl = short.replace("&amp;", "&")
-                    print "downloading from:\n{}".format(trueUrl)
+                    print "downloading to:\n{}\nfrom:\n{}".format(episode.fileFullPath, trueUrl)
                     r = requests.get(trueUrl, allow_redirects= True)
-                    open(fileName, 'wb').write(r.content)
+                    open(episode.fileFullPath, 'wb').write(r.content)
 
         time.sleep(10)
     
@@ -52,8 +70,8 @@ def getHtmlFromUrl(url, driver = None):
     
     return d
 
-def getUrlMapFromHtml(html, targetDir = ""):
-    mp = {}
+def getEpisodeFromHtml(html, parentDir = "", episodeName = ""):
+    rg = []
 
     #get portion of html containing all Urls and Ids
     target = ""
@@ -67,17 +85,16 @@ def getUrlMapFromHtml(html, targetDir = ""):
     target = target.replace('</div></div></li><li><div class="bfan-n"><div class="bfan-n">', '')
     target = target.replace('</div></div></li><li style="display: none;"><div class="bfan-n"><div class="bfan-n">', '')
 
-    for episode in target.split("</a>"):
-        stId = episode[-2:]
+    for episodeHtml in target.split("</a>"):
+        stId = episodeHtml[-2:]
         if not stId.isdigit(): continue
 
-        stPartialUrl = episode[episode.index("Readyplay"):(episode.index('%3d')+3)]
+        stPartialUrl = episodeHtml[episodeHtml.index("Readyplay"):(episodeHtml.index('%3d')+3)]
         stUrl = "http://www.dnvod.tv/Movie/{}".format(stPartialUrl)
-        stFileName = "{}{}.mp4".format(targetDir, stId)
-    
-        mp[stFileName] = stUrl
-    
-    return mp
+        
+        episode = Episode(stUrl, stId, parentDir, episodeName)
+        rg.append(episode)
+    return rg
 
 #get web driver
 def getDriver(absdFirefox = _FIREFOX_LOC, ):
@@ -95,17 +112,14 @@ def main():
     _URL = sys.argv[1]
     if len(sys.argv) > 2:
         episodeName = sys.argv[2]
-        targetDir = os.path.join(targetDir, episodeName)
-        if not os.path.exists(targetDir):
-            os.makedirs(targetDir)
-
-        # overwrite targetDir with targetDir/episodeName        
-        targetDir = os.path.join(targetDir, episodeName)
-
+    if len(sys.argv) > 3:
+        targetDir = sys.argv[3]
+        
     html = getHtmlFromUrl(_URL)
-    mp = getUrlMapFromHtml(html, targetDir)
-    for stFileName, stUrl in mp.iteritems():
-        downloadFromUrl(stUrl, stFileName)
+    rg = getEpisodeFromHtml(html, targetDir, episodeName)
+    rg = sorted(rg, key = lambda episode : int(episode.stId))
+    for episode in rg:
+        downloadFromEpisode(episode)
     
 if __name__ == "__main__":
     main()
