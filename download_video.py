@@ -1,8 +1,9 @@
+# this script aims at working on Mac OS, for other operation system needs to change _FIREFOX_LOC variable
 # prerequisite: make sure geckodriver is downloaded and put in same directory
 # download url: https://github.com/mozilla/geckodriver/releases
 
 import sys, time, requests
-import os.path
+import os
 from selenium import webdriver
 from selenium.webdriver.firefox.firefox_binary import FirefoxBinary
 
@@ -86,13 +87,20 @@ def getDriver(absdFirefox = _FIREFOX_LOC, ):
 
 def main():
     global _FIREFOX_LOC
-    targetDir = "/Volumes/USB_Storage/episodes/"
+    targetDir = ""
+    episodeName = ""
     if len(sys.argv) == 1: 
         print "Error: expect url paramter"
         return
     _URL = sys.argv[1]
     if len(sys.argv) > 2:
-        targetDir = os.path.join(targetDir, sys.argv[2], sys.argv[2])
+        episodeName = sys.argv[2]
+        targetDir = os.path.join(targetDir, episodeName)
+        if not os.path.exists(targetDir):
+            os.makedirs(targetDir)
+
+        # overwrite targetDir with targetDir/episodeName        
+        targetDir = os.path.join(targetDir, episodeName)
 
     html = getHtmlFromUrl(_URL)
     mp = getUrlMapFromHtml(html, targetDir)
