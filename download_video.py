@@ -1,3 +1,6 @@
+# prerequisite: make sure geckodriver is downloaded and put in same directory
+# download url: https://github.com/mozilla/geckodriver/releases
+
 import sys, time, requests
 import os.path
 from selenium import webdriver
